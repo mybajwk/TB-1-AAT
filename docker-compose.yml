@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  # core-infrastructure
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: reporting_db
+    ports:
+      - "5432:5432"
+
+  # services
+  api-gateway:
+    build: ./apps/api-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - AUTH_SERVICE_URL=http://auth-service:3001
+      - ROUTING_SERVICE_URL=http://routing-service:8080
+      - NOTIFICATION_SERVICE_URL=http://notification-service:3002
+      - ANALYTICS_SERVICE_URL=http://analytics-service:8081
+    depends_on:
+      - auth-service
+      - routing-service
+      - notification-service
+      - analytics-service
+
+  auth-service:
+    build: ./apps/auth-service
+    environment:
+      - PORT=3001
+      - DB_URL=postgres://user:password@postgres:5432/reporting_db
+      - JWT_SECRET=supersecretkey
+    depends_on:
+      - postgres
+
+  routing-service:
+    build: ./apps/routing-service
+    environment:
+      - PORT=8080
+    depends_on:
+      - redis
+
+  notification-service:
+    build: ./apps/notification-service
+    environment:
+      - PORT=3002
+    depends_on:
+      - redis
+
+  analytics-service:
+    build: ./apps/analytics-service
+    environment:
+      - PORT=8081
+    depends_on:
+      - postgres

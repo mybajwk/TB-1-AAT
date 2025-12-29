@@ -1,0 +1,253 @@
+# --- Auth Service ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  namespace: citizen-reporting
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: auth-service
+  template:
+    metadata:
+      labels:
+        app: auth-service
+    spec:
+      containers:
+      - name: auth-service
+        image: auth-service:latest # Needs minikube docker-env or real registry
+        imagePullPolicy: Never # For local minikube images
+        env:
+        - name: PORT
+          value: "3001"
+        - name: DB_URL
+          value: "postgres://user:password@postgres:5432/reporting_db" # Simplified connection string
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: JWT_SECRET
+        ports:
+        - containerPort: 3001
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+  namespace: citizen-reporting
+spec:
+  selector:
+    app: auth-service
+  ports:
+    - protocol: TCP
+      port: 3001
+      targetPort: 3001
+
+---
+# --- Report Service ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: report-service
+  namespace: citizen-reporting
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: report-service
+  template:
+    metadata:
+      labels:
+        app: report-service
+    spec:
+      containers:
+      - name: report-service
+        image: report-service:latest
+        imagePullPolicy: Never
+        env:
+        - name: PORT
+          value: "3003"
+        - name: ROUTING_SERVICE_URL
+          value: "http://routing-service:8080"
+        - name: NOTIFICATION_SERVICE_URL
+          value: "http://notification-service:3002"
+        ports:
+        - containerPort: 3003
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: report-service
+  namespace: citizen-reporting
+spec:
+  selector:
+    app: report-service
+  ports:
+    - protocol: TCP
+      port: 3003
+      targetPort: 3003
+
+---
+# --- Routing Service ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: routing-service
+  namespace: citizen-reporting
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: routing-service
+  template:
+    metadata:
+      labels:
+        app: routing-service
+    spec:
+      containers:
+      - name: routing-service
+        image: routing-service:latest
+        imagePullPolicy: Never
+        env:
+        - name: PORT
+          value: "8080"
+        ports:
+        - containerPort: 8080
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: routing-service
+  namespace: citizen-reporting
+spec:
+  selector:
+    app: routing-service
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+
+---
+# --- Notification Service ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+  namespace: citizen-reporting
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notification-service
+  template:
+    metadata:
+      labels:
+        app: notification-service
+    spec:
+      containers:
+      - name: notification-service
+        image: notification-service:latest
+        imagePullPolicy: Never
+        env:
+        - name: PORT
+          value: "3002"
+        ports:
+        - containerPort: 3002
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-service
+  namespace: citizen-reporting
+spec:
+  selector:
+    app: notification-service
+  ports:
+    - protocol: TCP
+      port: 3002
+      targetPort: 3002
+
+---
+# --- Analytics Service ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analytics-service
+  namespace: citizen-reporting
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: analytics-service
+  template:
+    metadata:
+      labels:
+        app: analytics-service
+    spec:
+      containers:
+      - name: analytics-service
+        image: analytics-service:latest
+        imagePullPolicy: Never
+        env:
+        - name: PORT
+          value: "8081"
+        ports:
+        - containerPort: 8081
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: analytics-service
+  namespace: citizen-reporting
+spec:
+  selector:
+    app: analytics-service
+  ports:
+    - protocol: TCP
+      port: 8081
+      targetPort: 8081
+
+---
+# --- API Gateway ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: citizen-reporting
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      containers:
+      - name: api-gateway
+        image: api-gateway:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8000
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  namespace: citizen-reporting
+spec:
+  selector:
+    app: api-gateway
+  type: LoadBalancer # Or NodePort for Minikube convenience
+  ports:
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000

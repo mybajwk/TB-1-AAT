@@ -3,9 +3,9 @@ node_modules/
 dist/
 build/
 
-# Go
-routing-service
-analytics-service
+# Go Binaries (specific)
+apps/routing-service/routing-service
+apps/analytics-service/analytics-service
 *.exe
 *.test
 *.out

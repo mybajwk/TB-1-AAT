@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: citizen-reporting
+data:
+  AUTH_SERVICE_URL: "http://auth-service:3001"
+  ROUTING_SERVICE_URL: "http://routing-service:8080"
+  NOTIFICATION_SERVICE_URL: "http://notification-service:3002"
+  ANALYTICS_SERVICE_URL: "http://analytics-service:8081"
+  DB_HOST: "postgres"
+  DB_PORT: "5432"
+  DB_USER: "user"
+  DB_NAME: "reporting_db"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-secrets
+  namespace: citizen-reporting
+type: Opaque
+stringData:
+  DB_PASSWORD: "password"
+  JWT_SECRET: "supersecretkey"
