@@ -24,9 +24,10 @@ This directory contains the manifests to deploy the system to Kubernetes (e.g., 
     ```bash
     docker build -t api-gateway:latest ./apps/api-gateway
     docker build -t auth-service:latest ./apps/auth-service
-    docker build -t routing-service:latest ./apps/routing-service
+    docker build -t report-service:latest ./apps/report-service
     docker build -t notification-service:latest ./apps/notification-service
     docker build -t analytics-service:latest ./apps/analytics-service
+    docker build -t multimedia-service:latest ./apps/multimedia-service
     ```
 
 4.  **Apply Manifests**:
@@ -35,6 +36,7 @@ This directory contains the manifests to deploy the system to Kubernetes (e.g., 
     kubectl apply -f k8s/01-config.yaml
     kubectl apply -f k8s/02-infrastructure.yaml
     kubectl apply -f k8s/03-apps.yaml
+    kubectl apply -f k8s/04-observability.yaml
     ```
 
 5.  **Access the API Gateway**:
@@ -43,3 +45,23 @@ This directory contains the manifests to deploy the system to Kubernetes (e.g., 
     minikube service api-gateway -n citizen-reporting --url
     ```
     Use the returned URL to send requests.
+
+## Observability (Prometheus + Grafana)
+
+After deploying, access the monitoring tools:
+
+1.  **Prometheus UI**:
+    ```bash
+    minikube service prometheus -n citizen-reporting --url
+    ```
+    - Query metrics at `/graph`
+    - Check targets at `/targets`
+
+2.  **Grafana Dashboard**:
+    ```bash
+    minikube service grafana -n citizen-reporting --url
+    ```
+    - Login: `admin` / `admin123`
+    - Prometheus datasource is pre-configured
+    - Create dashboards to visualize HTTP request metrics
+

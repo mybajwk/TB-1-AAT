@@ -7,10 +7,41 @@ const { PrismaClient } = require('@prisma/client');
 const morgan = require('morgan');
 const { createClient } = require('redis');
 
+// Prometheus Metrics
+const promClient = require('prom-client');
+const collectDefaultMetrics = promClient.collectDefaultMetrics;
+collectDefaultMetrics({ prefix: 'report_service_' });
+
+// Custom Metrics
+const httpRequestDuration = new promClient.Histogram({
+    name: 'http_request_duration_seconds',
+    help: 'Duration of HTTP requests in seconds',
+    labelNames: ['method', 'route', 'status_code'],
+    buckets: [0.1, 0.5, 1, 2, 5]
+});
+
+const httpRequestTotal = new promClient.Counter({
+    name: 'http_requests_total',
+    help: 'Total number of HTTP requests',
+    labelNames: ['method', 'route', 'status_code']
+});
+
 const prisma = new PrismaClient();
 const app = express();
 app.use(express.json());
 app.use(morgan('combined'));
+
+// Prometheus Middleware - Track all requests
+app.use((req, res, next) => {
+    const start = Date.now();
+    res.on('finish', () => {
+        const duration = (Date.now() - start) / 1000;
+        const route = req.route ? req.route.path : req.path;
+        httpRequestDuration.labels(req.method, route, res.statusCode).observe(duration);
+        httpRequestTotal.labels(req.method, route, res.statusCode).inc();
+    });
+    next();
+});
 
 const PORT = process.env.PORT || 3003;
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';
@@ -58,6 +89,12 @@ function maskReport(report, viewerId) {
     }
     return report;
 }
+
+// Prometheus Metrics Endpoint
+app.get('/metrics', async (req, res) => {
+    res.set('Content-Type', promClient.register.contentType);
+    res.end(await promClient.register.metrics());
+});
 
 // Health Check
 app.get('/health', (req, res) => {
@@ -165,10 +202,23 @@ app.get('/reports/my-reports', authenticateToken, async (req, res) => {
     }
 });
 
+// GET /categories - List all categories
+app.get('/categories', async (req, res) => {
+    try {
+        const categories = await prisma.reportCategory.findMany({
+            orderBy: { name: 'asc' }
+        });
+        res.json(categories);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch categories' });
+    }
+});
+
 // POST /reports - Create
 app.post('/reports', authenticateToken, async (req, res) => {
     try {
-        const { title, description, location_lat, location_long, visibility_name, address_text, media_urls } = req.body;
+        const { title, description, location_lat, location_long, visibility_name, address_text, media_urls, category_name } = req.body;
 
         if (!title || !description) return res.status(400).json({ error: 'Missing title or description' });
 
@@ -176,7 +226,15 @@ app.post('/reports', authenticateToken, async (req, res) => {
             where: { name: visibility_name || 'private' }
         });
         const statusPending = await prisma.reportStatus.findUnique({ where: { name: 'pending' } });
-        const category = await prisma.reportCategory.findUnique({ where: { name: 'Lainnya' } });
+
+        // Dynamic category selection with fallback to 'Lainnya'
+        let category = null;
+        if (category_name) {
+            category = await prisma.reportCategory.findUnique({ where: { name: category_name } });
+        }
+        if (!category) {
+            category = await prisma.reportCategory.findUnique({ where: { name: 'Lainnya' } });
+        }
 
         let multimediaData = [];
         if (media_urls && Array.isArray(media_urls) && media_urls.length > 0) {
