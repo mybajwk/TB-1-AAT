@@ -1,50 +1,76 @@
 # Distributed Citizen Reporting System (PoC)
 
 ## Overview
-This is a Proof-of-Concept for a scalable, distributed citizen reporting system designed for a city with 2.5 million inhabitants. It uses a **Microservices Architecture** with an **API Gateway**, implemented using **Node.js** and **Go**.
+This is a robust Proof-of-Concept for a scalable, distributed citizen reporting system designed for high concurrency (target 2.5 million inhabitants). It uses a **Microservices Architecture** orchestrated on **Kubernetes**, implemented primarily using **Node.js**.
 
 ## Architecture
 
 ### Services
-1.  **API Gateway (Node.js)**: Entry point, handles routing to other services.
-    - Port: `8000`
-2.  **Auth Service (Node.js)**: Manages user registration and JWT authentication.
-    - Port: `3001`
-3.  **Routing & Classification Service (Go)**: Classifies reports using mock logic.
-    - Port: `8080`
-4.  **Notification Service (Node.js)**: Simulates sending email/push notifications.
-    - Port: `3002`
-5.  **Analytics Service (Go)**: Provides dashboard statistics.
-    - Port: `8081`
+1.  **API Gateway (Nginx)**: High-performance entry point, handles routing / load balancing.
+    - Node Port: `30080` (mapped to ClusterIPs)
+2.  **Auth Service (Node.js)**: 
+    - RBAC (Citizen, Authority, Admin).
+    - Features: JWT Auth, Department-based Registration.
+3.  **Report Service (Node.js)**: 
+    - Core logic for reporting.
+    - Features: **Redis Caching** (Cache-Aside), **Department Isolation**, **Anonymity Masking**, **Auto-Escalation** (Cron).
+4.  **Multimedia Service (Node.js)**: 
+    - Handles file uploads to disk storage (pvc).
+5.  **Notification Service (Node.js)**: 
+    - **Real-time** updates via Socket.IO.
+    - **FCM** integration for Push Notifications.
+6.  **Analytics Service (Node.js)**: 
+    - Aggregates daily stats and performance metrics.
 
 ### Infrastructure
-- **Docker Compose**: Orchestrates all services and databases.
-- **PostgreSQL**: Database for Auth and (future) Report services.
-- **Redis**: For caching (setup in compose, ready for integration).
+- **Kubernetes (Minikube)**: Orchestration.
+- **PostgreSQL**: Primary Database (shared instance for PoC).
+- **Redis**: Caching layer for high-read endpoints (`GET /reports`).
+- **Persistent Volumes**: For database data and multimedia files.
 
 ## Tech Stack
-- **Node.js**: API Gateway, Auth, Notification
-- **Go (Golang)**: Routing, Analytics
-- **Docker**: Containerization
+- **Runtime**: Node.js (Express)
+- **Database**: PostgreSQL (Prisma ORM)
+- **Caching**: Redis
+- **Real-time**: Socket.IO
+- **Containerization**: Docker & Kubernetes
 
-## Setup & Run
+## Key Features Implemented
+- **Department Isolation**: Authorities only see reports relevant to their department.
+- **Anonymity**: Public/Authority cannot see the identity of anonymous reporters, but system tracks ownership.
+- **Reliability (Outbox Pattern)**: Notifications are saved to DB first, then processed by a robust cron job to ensure delivery.
+- **Performance**: High-traffic read endpoints are cached.
+- **Escalation**: Reports pending > 24h are auto-escalated.
+
+## Setup & Deployment
 
 ### Prerequisites
-- Docker & Docker Compose
-- Node.js (for local dev)
-- Go (for local dev)
+- Docker
+- Minikube
+- Node.js (for running tests)
 
-### Run with Docker Compose
-```bash
-docker-compose up --build
-```
+### Deployment Steps
+1.  **Start Minikube**:
+    ```bash
+    minikube start
+    eval $(minikube docker-env)
+    ```
+2.  **Build Images**:
+    ```bash
+    docker build -t auth-service:latest ./apps/auth-service
+    docker build -t report-service:latest ./apps/report-service
+    docker build -t analytics-service:latest ./apps/analytics-service
+    docker build -t notification-service:latest ./apps/notification-service
+    docker build -t multimedia-service:latest ./apps/multimedia-service
+    docker build -t api-gateway:latest ./apps/api-gateway
+    ```
+3.  **Apply Manifests**:
+    ```bash
+    kubectl apply -f k8s/
+    ```
+4.  **Access System**:
+    - URL: `http://<MINIKUBE_IP>:30080/api/v1/...`
+    - Swagger Documentation: `docs/swagger.yaml`
 
-### API Endpoints (via Gateway)
-
-- **Auth**: `POST http://localhost:8000/auth/register`, `POST http://localhost:8000/auth/login`
-- **Classify**: `POST http://localhost:8000/classify/classify`
-- **Notify**: `POST http://localhost:8000/notify/send`
-- **Analytics**: `GET http://localhost:8000/analytics/stats`
-
-### Kubernetes (Minikube)
-See [k8s/README.md](k8s/README.md) for instructions on how to deploy to Minikube.
+## Testing
+See [TESTING_SCENARIO.md](TESTING_SCENARIO.md) for detailed instructions on running Integration and Load tests.

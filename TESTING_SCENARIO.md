@@ -1,46 +1,69 @@
-# Testing Scenarios
+# Testing Scenario Guide
 
-## 1. Functional Testing (Integration)
+This document outlines the testing strategies implemented for the Distributed Citizen Reporting System PoC.
 
-These scenarios verify that the microservices communicate correctly to fulfill the business requirements.
+## 1. End-to-End (E2E) Integration Test
 
-### Scenario A: Public Report Submission (End-to-End)
-**Goal**: Verify a user can submit a report and it gets classified and notified.
-1.  **Request**: `POST /reports`
-    *   Body: `{"title": "Broken light", "description": "Lampu jalan mati", "location": {...}, "visibility": "public"}`
-2.  **Expected Behavior**:
-    *   **Routing Service**: Receives description "Lampu jalan mati", returns category "infrastructure" (or similar).
-    *   **Report Service**: Saves report with status "submitted".
-    *   **Notification Service**: Receives request to notify "Dinas PU" (Infrastructure authority).
-3.  **Verification**: Response should include `report_id` and `category: "infrastructure"`.
+This test verifies the complete user flow across multiple microservices (`Auth` -> `Report` -> `Multimedia` -> `Notification` -> `Analytics`).
 
-### Scenario B: Anonymous Reporting
-**Goal**: Verify privacy requirement (S1d).
-1.  **Request**: `POST /reports`
-    *   Body: `{"..., "visibility": "anonymous", "user_id": "user-123"}`
-2.  **Expected Behavior**:
-    *   **Report Service**: Saves the report but forces `user_id` to `null`.
-3.  **Verification**: creating the report should return a `user_id: null` in the response body.
+### Scenario Covered:
+1.  **Citizen Registration**: A new citizen registers.
+2.  **Authority Registration**: A new authority registers for 'Dinas Kebersihan'.
+3.  **Login**: Both users obtain JWT tokens.
+4.  **Report Creation**: Citizen creates a public report (Trash issue).
+5.  **Department Isolation Check**: 
+    - Authority (Kebersihan) **SHOULD** see the report.
+    - Authority (Other Dept) **SHOULD NOT** see the report.
+6.  **Status Update**: Authority updates status to 'IN_PROGRESS'.
+7.  **Verification**: Check if status is updated and Notification is triggered.
 
-### Scenario C: System Health
-**Goal**: Verify all services are reachable via Gateway.
-1.  **Request**: `GET /health` (Gateway) -> 200 OK.
-2.  **Request**: `GET /report/health` (via Gateway or port forwarding) -> 200 OK.
+### How to Run:
+Ensure the system is running in Kubernetes and exposed at `http://localhost:30080` (tunneling may be required for local dev).
+
+```bash
+# Install dependencies
+npm install axios
+
+# Run the script
+node tests/integration/e2e-flow.js
+```
 
 ---
 
-## 2. Load Testing (Scalability)
+## 2. Low-Level Stress / Load Test
 
-**Goal**: Demonstrate the system can handle high concurrency (simulating 2.5m user base traffic spikes).
+This test simulates high concurrency to validate the system's stability and the effectiveness of **Redis Caching**.
 
-**Tool**: k6
-**Script**: `tests/load/k6-script.js`
+### Scenario:
+- **Concurrent Users**: 500 (Simulated)
+- **Duration**: Continuous bursts
+- **Target**: `GET /api/v1/auth/health` (Can be modified to target `GET /reports` to test Redis).
 
-### Configuration
-*   **Virtual Users (VUs)**: Ramp up to 100-500 VUs.
-*   **Duration**: 2-5 minutes.
-*   **Target**: API Gateway URL.
+### Strategy:
+The script uses `Promise.all` to fire hundreds of requests in parallel, measuring:
+- Success Rate
+- Average Latency
+- Errors
 
-### Success Metrics
-*   **Error Rate**: < 1%
-*   **P95 Latency**: < 500ms for Writes, < 200ms for Reads.
+### How to Run:
+```bash
+node tests/stress/load-test.js
+```
+
+## 3. Manual Verification Steps
+
+### Redis Caching Check
+1.  Create a Report as Citizen.
+2.  Call `GET /api/v1/reports` as Citizen. (Response 1: Cache Miss -> DB -> Redis).
+3.  Call `GET /api/v1/reports` again immediately. (Response 2: **Cache Hit** -> Faster).
+4.  Check logs of `report-service` pod:
+    ```bash
+    kubectl logs -l app=report-service -f
+    ```
+    Look for `⚡️ [Redis] Cache Hit`.
+
+### Real-time Notification Check
+1.  Connect a Socket.IO client to `ws://<HOST>:30080`.
+2.  Listen to `notification` event.
+3.  Trigger an update on a report you follow.
+4.  Verify event is received instantly.
