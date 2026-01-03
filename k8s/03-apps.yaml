@@ -5,7 +5,7 @@ metadata:
   name: auth-service
   namespace: citizen-reporting
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: auth-service
@@ -16,13 +16,24 @@ spec:
     spec:
       containers:
       - name: auth-service
-        image: auth-service:latest # Needs minikube docker-env or real registry
-        imagePullPolicy: Never # For local minikube images
+        image: auth-service:latest
+        imagePullPolicy: Never
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "256Mi"
         env:
         - name: PORT
           value: "3001"
-        - name: DB_URL
-          value: "postgres://user:password@postgres:5432/reporting_db" # Simplified connection string
+        # Using DATABASE_URL from Secret (Best for Prisma)
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: DATABASE_URL
         - name: JWT_SECRET
           valueFrom:
             secretKeyRef:
@@ -53,7 +64,7 @@ metadata:
   name: report-service
   namespace: citizen-reporting
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: report-service
@@ -66,12 +77,36 @@ spec:
       - name: report-service
         image: report-service:latest
         imagePullPolicy: Never
+        resources:
+          requests:
+            cpu: "200m"
+            memory: "256Mi"
+          limits:
+            cpu: "1000m"
+            memory: "512Mi"
         env:
         - name: PORT
           value: "3003"
-
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: DATABASE_URL
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: JWT_SECRET
+        - name: REDIS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: REDIS_URL
         - name: NOTIFICATION_SERVICE_URL
-          value: "http://notification-service:3002"
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: NOTIFICATION_SERVICE_URL
         ports:
         - containerPort: 3003
 
@@ -88,8 +123,6 @@ spec:
     - protocol: TCP
       port: 3003
       targetPort: 3003
-
-
 
 ---
 # --- Notification Service ---
@@ -112,6 +145,13 @@ spec:
       - name: notification-service
         image: notification-service:latest
         imagePullPolicy: Never
+        resources:
+          requests:
+            cpu: "50m"
+            memory: "64Mi"
+          limits:
+            cpu: "200m"
+            memory: "128Mi"
         env:
         - name: PORT
           value: "3002"
@@ -153,9 +193,21 @@ spec:
       - name: analytics-service
         image: analytics-service:latest
         imagePullPolicy: Never
+        resources:
+          requests:
+            cpu: "50m"
+            memory: "64Mi"
+          limits:
+            cpu: "200m"
+            memory: "128Mi"
         env:
         - name: PORT
           value: "8081"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: DATABASE_URL
         ports:
         - containerPort: 8081
 
@@ -194,6 +246,13 @@ spec:
       - name: multimedia-service
         image: multimedia-service:latest
         imagePullPolicy: Never
+        resources:
+          requests:
+            cpu: "50m"
+            memory: "128Mi"
+          limits:
+            cpu: "300m"
+            memory: "256Mi"
         env:
         - name: PORT
           value: "3004"
@@ -202,7 +261,7 @@ spec:
           mountPath: /usr/src/app/uploads
       volumes:
       - name: uploads-volume
-        emptyDir: {} # Ephemeral for POC, replace with PVC for production
+        emptyDir: {}
         ports:
         - containerPort: 3004
 
@@ -228,7 +287,7 @@ metadata:
   name: api-gateway
   namespace: citizen-reporting
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: api-gateway
@@ -241,6 +300,13 @@ spec:
       - name: api-gateway
         image: api-gateway:latest
         imagePullPolicy: Never
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "64Mi"
+          limits:
+            cpu: "500m"
+            memory: "128Mi"
         ports:
         - containerPort: 8000
 
@@ -253,8 +319,74 @@ metadata:
 spec:
   selector:
     app: api-gateway
-  type: LoadBalancer # Or NodePort for Minikube convenience
+  type: LoadBalancer
   ports:
     - protocol: TCP
       port: 8000
       targetPort: 8000
+
+---
+# Auto-Scale Auth Service based on CPU
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: auth-service-hpa
+  namespace: citizen-reporting
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: auth-service
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+
+---
+# Auto-Scale Report Service based on CPU
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: report-service-hpa
+  namespace: citizen-reporting
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: report-service
+  minReplicas: 2
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 60
+
+---
+# Auto-Scale API Gateway
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: api-gateway-hpa
+  namespace: citizen-reporting
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api-gateway
+  minReplicas: 2
+  maxReplicas: 15
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 60

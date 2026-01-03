@@ -8,6 +8,8 @@ data:
   ROUTING_SERVICE_URL: "http://routing-service:8080"
   NOTIFICATION_SERVICE_URL: "http://notification-service:3002"
   ANALYTICS_SERVICE_URL: "http://analytics-service:8081"
+  MULTIMEDIA_SERVICE_URL: "http://multimedia-service:3004"
+  REDIS_URL: "redis://redis:6379"
   DB_HOST: "postgres"
   DB_PORT: "5432"
   DB_USER: "user"
@@ -23,3 +25,5 @@ type: Opaque
 stringData:
   DB_PASSWORD: "password"
   JWT_SECRET: "supersecretkey"
+  # Prisma Connection String
+  DATABASE_URL: "postgresql://user:password@postgres:5432/reporting_db?schema=public"
