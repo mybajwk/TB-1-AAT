@@ -1,0 +1,294 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DB_URL")
+}
+
+// 1. Master Data
+
+model ReportVisibility {
+  id          String  @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name        String  @unique @db.VarChar(50)
+  description String?
+  
+  reports     Report[]
+
+  @@map("report_visibilities")
+}
+
+model ReportStatus {
+  id          String  @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name        String  @unique @db.VarChar(50)
+  description String?
+  isFinal     Boolean @default(false) @map("is_final")
+
+  reportsAsCurrent Report[] @relation("CurrentStatus")
+  historyPrevious  ReportHistory[] @relation("PreviousStatus")
+  historyNew       ReportHistory[] @relation("NewStatus")
+  
+  analytics     AnalyticsDailyReport[]
+
+  @@map("report_statuses")
+}
+
+model NotificationType {
+  id          String  @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name        String  @unique @db.VarChar(50)
+  description String?
+
+  notifications Notification[]
+
+  @@map("notification_types")
+}
+
+// 2. User Management & RBAC
+
+model Role {
+  id          String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name        String   @unique @db.VarChar(50)
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  userRoles       UserRole[]
+  rolePermissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name        String   @unique @db.VarChar(100)
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String @map("role_id") @db.Uuid
+  permissionId String @map("permission_id") @db.Uuid
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model User {
+  id                String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  email             String   @unique @db.VarChar(255)
+  passwordHash      String   @map("password_hash") @db.VarChar(255)
+  fullName          String   @map("full_name") @db.VarChar(100)
+  phoneNumber       String?  @map("phone_number") @db.VarChar(20)
+  profilePictureUrl String?  @map("profile_picture_url")
+  nik               String?  @unique @db.VarChar(20)
+  isActive          Boolean  @default(true) @map("is_active")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  userRoles       UserRole[]
+  authorityDetails Authority?
+  
+  reportsCreated  Report[] @relation("Reporter")
+  reportsAssigned Report[] @relation("AssignedAuthority")
+  
+  reportHistory   ReportHistory[]
+  reportUpvotes   ReportUpvote[]
+  comments        Comment[]
+  notifications   Notification[]
+  
+  analyticsPerformance AnalyticsAuthorityPerformance[]
+
+  @@map("users")
+}
+
+model UserRole {
+  userId String @map("user_id") @db.Uuid
+  roleId String @map("role_id") @db.Uuid
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model Authority {
+  userId            String @id @map("user_id") @db.Uuid
+  agencyName        String @map("agency_name") @db.VarChar(100)
+  department        String? @db.VarChar(100)
+  jurisdictionLevel String? @map("jurisdiction_level") @db.VarChar(50)
+  responsibilities  String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("authorities")
+}
+
+// 3. Reporting System
+
+model ReportCategory {
+  id               String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name             String   @unique @db.VarChar(50)
+  description      String?
+  targetAgencyType String?  @map("target_agency_type") @db.VarChar(100)
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  reports          Report[]
+  analytics        AnalyticsDailyReport[]
+
+  @@map("report_categories")
+}
+
+model Report {
+  id                  String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  reporterId          String?  @map("reporter_id") @db.Uuid
+  categoryId          String?  @map("category_id") @db.Uuid
+  title               String   @db.VarChar(200)
+  description         String
+  locationLatitude    Decimal? @map("location_latitude") @db.Decimal(9, 6)
+  locationLongitude   Decimal? @map("location_longitude") @db.Decimal(9, 6)
+  addressText         String?  @map("address_text")
+  
+  visibilityId        String?  @map("visibility_id") @db.Uuid
+  statusId            String?  @map("status_id") @db.Uuid
+  assignedAuthorityId String?  @map("assigned_authority_id") @db.Uuid
+  
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  reporter          User?            @relation("Reporter", fields: [reporterId], references: [id])
+  category          ReportCategory?  @relation(fields: [categoryId], references: [id])
+  visibility        ReportVisibility? @relation(fields: [visibilityId], references: [id])
+  status            ReportStatus?    @relation("CurrentStatus", fields: [statusId], references: [id])
+  assignedAuthority User?            @relation("AssignedAuthority", fields: [assignedAuthorityId], references: [id])
+
+  multimedia ReportMultimedia[]
+  history    ReportHistory[]
+  upvotes    ReportUpvote[]
+  comments   Comment[]
+
+  @@index([reporterId])
+  @@index([statusId])
+  @@index([categoryId])
+  @@index([locationLatitude, locationLongitude])
+  @@map("reports")
+}
+
+model ReportMultimedia {
+  id        String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  reportId  String   @map("report_id") @db.Uuid
+  mediaUrl  String   @map("media_url")
+  mediaType String?  @map("media_type") @db.VarChar(50)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@map("report_multimedia")
+}
+
+model ReportHistory {
+  id              String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  reportId        String   @map("report_id") @db.Uuid
+  changedByUserId String?  @map("changed_by_user_id") @db.Uuid
+  
+  previousStatusId String? @map("previous_status_id") @db.Uuid
+  newStatusId      String? @map("new_status_id") @db.Uuid
+  
+  notes           String?
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  report         Report        @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  changedByUser  User?         @relation(fields: [changedByUserId], references: [id])
+  previousStatus ReportStatus? @relation("PreviousStatus", fields: [previousStatusId], references: [id])
+  newStatus      ReportStatus? @relation("NewStatus", fields: [newStatusId], references: [id])
+
+  @@map("report_history")
+}
+
+// 4. Interaction
+
+model ReportUpvote {
+  reportId  String   @map("report_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([reportId, userId])
+  @@map("report_upvotes")
+}
+
+model Comment {
+  id         String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  reportId   String   @map("report_id") @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  content    String
+  isInternal Boolean  @default(false) @map("is_internal")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("comments")
+}
+
+// 5. Notifications
+
+model Notification {
+  id                String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId            String   @map("user_id") @db.Uuid
+  title             String   @db.VarChar(100)
+  message           String
+  typeId            String?  @map("type_id") @db.Uuid
+  relatedResourceId String?  @map("related_resource_id") @db.Uuid
+  isRead            Boolean  @default(false) @map("is_read")
+  isSent            Boolean  @default(false) @map("is_sent")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type NotificationType? @relation(fields: [typeId], references: [id])
+
+  @@index([userId])
+  @@map("notifications")
+}
+
+// 7. Analytics
+
+model AnalyticsDailyReport {
+  id         String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  reportDate DateTime @map("report_date") @db.Date
+  categoryId String?  @map("category_id") @db.Uuid
+  statusId   String?  @map("status_id") @db.Uuid
+  region     String?  @db.VarChar(100)
+  totalCount Int      @default(0) @map("total_count")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  category ReportCategory? @relation(fields: [categoryId], references: [id])
+  status   ReportStatus?   @relation(fields: [statusId], references: [id])
+
+  @@unique([reportDate, categoryId, statusId, region])
+  @@map("analytics_daily_reports")
+}
+
+model AnalyticsAuthorityPerformance {
+  id                   String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  authorityUserId      String   @map("authority_user_id") @db.Uuid
+  monthStartDate       DateTime @map("month_start_date") @db.Date
+  reportsAssigned      Int      @default(0) @map("reports_assigned")
+  reportsResolved      Int      @default(0) @map("reports_resolved")
+  avgResolutionTimeHrs Decimal? @map("avg_resolution_time_hours") @db.Decimal(10, 2)
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  authorityUser User @relation(fields: [authorityUserId], references: [id], onDelete: Cascade)
+
+  @@unique([authorityUserId, monthStartDate])
+  @@map("analytics_authority_performance")
+}

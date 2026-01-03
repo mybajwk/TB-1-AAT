@@ -69,8 +69,7 @@ spec:
         env:
         - name: PORT
           value: "3003"
-        - name: ROUTING_SERVICE_URL
-          value: "http://routing-service:8080"
+
         - name: NOTIFICATION_SERVICE_URL
           value: "http://notification-service:3002"
         ports:
@@ -90,46 +89,7 @@ spec:
       port: 3003
       targetPort: 3003
 
----
-# --- Routing Service ---
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: routing-service
-  namespace: citizen-reporting
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: routing-service
-  template:
-    metadata:
-      labels:
-        app: routing-service
-    spec:
-      containers:
-      - name: routing-service
-        image: routing-service:latest
-        imagePullPolicy: Never
-        env:
-        - name: PORT
-          value: "8080"
-        ports:
-        - containerPort: 8080
 
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: routing-service
-  namespace: citizen-reporting
-spec:
-  selector:
-    app: routing-service
-  ports:
-    - protocol: TCP
-      port: 8080
-      targetPort: 8080
 
 ---
 # --- Notification Service ---
@@ -212,6 +172,53 @@ spec:
     - protocol: TCP
       port: 8081
       targetPort: 8081
+
+---
+# --- Multimedia Service ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: multimedia-service
+  namespace: citizen-reporting
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: multimedia-service
+  template:
+    metadata:
+      labels:
+        app: multimedia-service
+    spec:
+      containers:
+      - name: multimedia-service
+        image: multimedia-service:latest
+        imagePullPolicy: Never
+        env:
+        - name: PORT
+          value: "3004"
+        volumeMounts:
+        - name: uploads-volume
+          mountPath: /usr/src/app/uploads
+      volumes:
+      - name: uploads-volume
+        emptyDir: {} # Ephemeral for POC, replace with PVC for production
+        ports:
+        - containerPort: 3004
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: multimedia-service
+  namespace: citizen-reporting
+spec:
+  selector:
+    app: multimedia-service
+  ports:
+    - protocol: TCP
+      port: 3004
+      targetPort: 3004
 
 ---
 # --- API Gateway ---

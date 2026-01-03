@@ -1,0 +1,290 @@
+openapi: 3.0.0
+info:
+  title: Distributed Citizen Reporting System API
+  description: Unified API documentation for the Citizen Reporting Microservices System.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8000
+    description: API Gateway (Nginx)
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        fullName:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+
+    Report:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        locationLatitude: 
+          type: number
+        locationLongitude:
+          type: number
+        addressText:
+          type: string
+        mediaUrls:
+          type: array
+          items:
+            type: string
+        status:
+          type: object
+          properties:
+            name:
+              type: string
+        reporter:
+          type: object
+          nullable: true
+          properties:
+            fullName:
+              type: string
+
+paths:
+  # --- AUTH SERVICE ---
+  /auth/register:
+    post:
+      summary: Register a new user (Citizen or Authority)
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, full_name]
+              properties:
+                email: { type: string }
+                password: { type: string }
+                full_name: { type: string }
+                nik: { type: string }
+                role: { type: string, enum: [citizen, authority] }
+                agency_name: { type: string, description: "Required for authority" }
+                department: { type: string, description: "Required for authority (e.g., 'Kebersihan')" }
+      responses:
+        201:
+          description: User registered successfully
+
+  /auth/login:
+    post:
+      summary: Login
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string }
+                password: { type: string }
+      responses:
+        200:
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string }
+                  user: { $ref: '#/components/schemas/User' }
+
+  # --- MULTIMEDIA SERVICE ---
+  /multimedia/upload:
+    post:
+      summary: Upload a file
+      tags: [Multimedia]
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        200:
+          description: File uploaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  fileId: { type: string }
+                  url: { type: string }
+
+  # --- REPORT SERVICE ---
+  /reports:
+    get:
+      summary: List reports
+      tags: [Reports]
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: List of reports (masked if anonymous)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Report'
+    post:
+      summary: Create a new report
+      tags: [Reports]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, description]
+              properties:
+                title: { type: string }
+                description: { type: string }
+                location_lat: { type: number }
+                location_long: { type: number }
+                address_text: { type: string }
+                visibility_name: { type: string, enum: [public, private, anonymous] }
+                media_urls: 
+                  type: array
+                  items: { type: string }
+      responses:
+        201:
+          description: Report created
+
+  /reports/my-reports:
+    get:
+      summary: List my own reports
+      tags: [Reports]
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: List of own reports
+
+  /reports/{id}:
+    get:
+      summary: Get report detail
+      tags: [Reports]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Report detail
+
+  /reports/{id}/status:
+    patch:
+      summary: Update report status (Authority/Admin only)
+      tags: [Reports]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status_name]
+              properties:
+                status_name: { type: string }
+                notes: { type: string }
+      responses:
+        200:
+          description: Status updated
+
+  /reports/{id}/upvote:
+    post:
+      summary: Upvote a report
+      tags: [Reports]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Upvoted
+
+  /reports/{id}/comments:
+    post:
+      summary: Add a comment
+      tags: [Reports]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content: { type: string }
+                is_internal: { type: boolean }
+      responses:
+        201:
+          description: Comment added
+
+  # --- ANALYTICS SERVICE ---
+  /analytics/daily:
+    get:
+      summary: Get daily report statistics
+      tags: [Analytics]
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Daily stats
+
+  /analytics/performance:
+    get:
+      summary: Get authority performance metrics
+      tags: [Analytics]
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Performance metrics
