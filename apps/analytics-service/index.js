@@ -59,7 +59,6 @@ app.get('/analytics/performance', authenticateToken, async (req, res) => {
 
 // POST /trigger-aggregation (Stub)
 app.post('/trigger-aggregation', authenticateToken, (req, res) => {
-    // Stub for ETL process
     res.json({ message: 'Aggregation triggered (stub)' });
 });
 

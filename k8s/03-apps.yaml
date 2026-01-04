@@ -259,11 +259,12 @@ spec:
         volumeMounts:
         - name: uploads-volume
           mountPath: /usr/src/app/uploads
-      volumes:
-      - name: uploads-volume
-        emptyDir: {}
         ports:
         - containerPort: 3004
+      volumes:
+      - name: uploads-volume
+        persistentVolumeClaim:
+          claimName: multimedia-pvc
 
 ---
 apiVersion: v1

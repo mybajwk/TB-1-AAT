@@ -24,8 +24,6 @@ async function getRoleId(roleName) {
 
 // REGISTER
 app.post('/register', async (req, res) => {
-    // role is optional, defaults to 'citizen'
-    // For 'authority', extra details like agency_name might be needed (not implemented effectively here for simplicity)
     const { email, password, full_name, nik, role, agency_name, department } = req.body;
 
     if (!email || !password || !full_name) {
@@ -33,7 +31,6 @@ app.post('/register', async (req, res) => {
     }
 
     try {
-        // checks if user exists
         const existingUser = await prisma.user.findUnique({ where: { email } });
         if (existingUser) {
             return res.status(409).json({ error: 'Email already registered' });
@@ -47,7 +44,6 @@ app.post('/register', async (req, res) => {
             return res.status(400).json({ error: `Role '${targetRoleName}' not found` });
         }
 
-        // Transaction to create user and assign role
         const newUser = await prisma.$transaction(async (tx) => {
             const user = await tx.user.create({
                 data: {
@@ -65,13 +61,12 @@ app.post('/register', async (req, res) => {
                 },
             });
 
-            // If authority, create authority record (simple version)
             if (targetRoleName === 'authority' && agency_name) {
                 await tx.authority.create({
                     data: {
                         userId: user.id,
                         agencyName: agency_name,
-                        department: department || agency_name, // Fallback if dept not provided
+                        department: department || agency_name,
                         jurisdictionLevel: 'district', // default
                         responsibilities: 'General handling',
                     }

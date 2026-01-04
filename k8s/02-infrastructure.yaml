@@ -1,38 +1,29 @@
-# --- Redis ---
-apiVersion: apps/v1
-kind: Deployment
+# --- Persistent Volume Claim for Postgres ---
+apiVersion: v1
+kind: PersistentVolumeClaim
 metadata:
-  name: redis
+  name: postgres-pvc
   namespace: citizen-reporting
 spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: redis
-  template:
-    metadata:
-      labels:
-        app: redis
-    spec:
-      containers:
-      - name: redis
-        image: redis:alpine
-        ports:
-        - containerPort: 6379
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
 
 ---
+# --- Persistent Volume Claim for Multimedia (NFS-ready) ---
 apiVersion: v1
-kind: Service
+kind: PersistentVolumeClaim
 metadata:
-  name: redis
+  name: multimedia-pvc
   namespace: citizen-reporting
 spec:
-  selector:
-    app: redis
-  ports:
-    - protocol: TCP
-      port: 6379
-      targetPort: 6379
+  accessModes:
+    - ReadWriteOnce # Change to ReadWriteMany if using real NFS StorageClass
+  resources:
+    requests:
+      storage: 5Gi
 
 ---
 # --- Postgres ---
@@ -72,6 +63,13 @@ spec:
               key: DB_NAME
         ports:
         - containerPort: 5432
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+      volumes:
+      - name: postgres-storage
+        persistentVolumeClaim:
+          claimName: postgres-pvc
 
 ---
 apiVersion: v1
@@ -85,6 +83,8 @@ spec:
   ports:
     - protocol: TCP
       port: 5432
+      targetPort: 5432
+
 ---
 # --- Redis (Cache) ---
 apiVersion: apps/v1

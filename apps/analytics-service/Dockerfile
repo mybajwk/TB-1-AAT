@@ -1,22 +1,15 @@
-# Build Stage
-FROM golang:1.23-alpine AS builder
+FROM node:18-alpine
 
 WORKDIR /app
 
-COPY go.mod ./
-# COPY go.sum ./
+COPY package*.json ./
+RUN apk add --no-cache openssl
+RUN npm install
 
 COPY . .
 
-RUN go build -o analytics-service main.go
+RUN npx prisma generate
 
-# Run Stage
-FROM alpine:latest
+EXPOSE 8001
 
-WORKDIR /app
-
-COPY --from=builder /app/analytics-service .
-
-EXPOSE 8081
-
-CMD ["./analytics-service"]
+CMD ["node", "index.js"]

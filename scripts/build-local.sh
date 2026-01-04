@@ -4,9 +4,9 @@
 set -e
 
 echo "🐳 configuring docker environment for minikube..."
-eval $(minikube docker-env)
+# eval $(minikube docker-env)
 
-APPS=("api-gateway" "auth-service" "routing-service" "notification-service" "analytics-service")
+APPS=("api-gateway" "auth-service" "multimedia-service" "notification-service" "analytics-service" "report-service")
 
 echo "🚀 Building images..."
 
