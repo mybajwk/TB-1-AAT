@@ -14,10 +14,9 @@
 ### Anggota dan Kontribusi
 | Nama Mahasiswa | NIM | Kontribusi Utama |
 | :--- | :--- | :--- |
-| [Nama Anggota 1] | [NIM] | System Architect, K8s Infrastructure, API Gateway |
-| [Nama Anggota 2] | [NIM] | Backend (Report & Auth Service), DB Schema |
-| [Nama Anggota 3] | [NIM] | Backend (Notification & Analytics), Redis Integration |
-| [Nama Anggota 4] | [NIM] | Testing (E2E & Stress Test), Documentation |
+| [Enrique Yanuar] | [13522077] | System Architect, K8s Infrastructure, API Gateway, Testing (E2E & Stress Test), Documentation |
+| [Filbert] | [13522021] | Backend (Analytics & Auth Service), DB Schema |
+| [Mesachh Harmasendro] | [13522117] | Backend (Notification & report service), Redis  |
 
 ---
 

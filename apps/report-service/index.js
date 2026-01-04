@@ -40,7 +40,12 @@ function authenticateToken(req, res, next) {
     if (!token) return res.status(401).json({ error: 'Unauthorized: No token provided' });
 
     jwt.verify(token, JWT_SECRET, (err, user) => {
-        if (err) return res.status(403).json({ error: 'Forbidden: Invalid token' });
+        if (err) {
+            console.error('[AuthMiddleware] Verification Failed:', err.message);
+            console.error('[AuthMiddleware] Token (head):', token.substring(0, 20) + '...');
+            console.error('[AuthMiddleware] Secret (head):', JWT_SECRET.substring(0, 3) + '...');
+            return res.status(403).json({ error: 'Forbidden: Invalid token', details: err.message });
+        }
         req.user = user;
         next();
     });

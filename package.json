@@ -1,0 +1,13 @@
+{
+    "name": "citizen-reporting-system-tests",
+    "version": "1.0.0",
+    "description": "Test scripts for Distributed Citizen Reporting System",
+    "scripts": {
+        "test:e2e": "node tests/integration/e2e-flow.js",
+        "test:load": "node tests/stress/load-test.js",
+        "test:demo": "node tests/demo/req-scenario.js"
+    },
+    "dependencies": {
+        "axios": "^1.6.0"
+    }
+}
