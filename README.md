@@ -1,6 +1,6 @@
 # Distributed Citizen Reporting System (PoC)
-<!-- Pengerjaan laporan ini dan beberapa code diasistensikan oleh bantuan AI Gemini 3 Pro high dan Claude Oppus -->
-<!-- untuk Pembagian dan rancangan arsitektur tetap dilakukan oleh pribadi berdasarkan pengalaman pribadi dan berdasarkan referensi yang pernah dibaca oleh kami -->
+Pengerjaan laporan ini dan beberapa code diasistensikan oleh bantuan AI Gemini 3 Pro high dan Claude Oppus
+untuk Pembagian dan rancangan arsitektur tetap dilakukan oleh pribadi berdasarkan pengalaman pribadi dan berdasarkan referensi yang pernah dibaca oleh kami 
 ## Overview
 This is a robust Proof-of-Concept for a scalable, distributed citizen reporting system designed for high concurrency (target 2.5 million inhabitants). It uses a **Microservices Architecture** orchestrated on **Kubernetes**, implemented primarily using **Node.js**.
 
