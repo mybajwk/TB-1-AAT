@@ -72,5 +72,27 @@ This is a robust Proof-of-Concept for a scalable, distributed citizen reporting 
     - URL: `http://<MINIKUBE_IP>:30080/api/v1/...`
     - Swagger Documentation: `docs/swagger.yaml`
 
+### Database Initialization (First Time Only)
+Because this is a persistent architecture, you need to initialize the database schema and seed data once after the first deployment.
+
+1.  **Enable UUID Extension**:
+    ```bash
+    kubectl exec -it -n citizen-reporting deploy/postgres -- psql -U user -d reporting_db -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
+    ```
+
+2.  **Push Prisma Schema (Create Tables)**:
+    ```bash
+    kubectl exec -it -n citizen-reporting deploy/auth-service -- npx prisma db push
+    ```
+
+3.  **Seed Initial Data (Roles, Statuses, Categories)**:
+    ```bash
+    # Copy seed file to container
+    kubectl cp scripts/initial_schema.sql citizen-reporting/$(kubectl get pod -l app=postgres -n citizen-reporting -o jsonpath="{.items[0].metadata.name}"):/tmp/seed.sql
+    
+    # Execute seed
+    kubectl exec -it -n citizen-reporting deploy/postgres -- psql -U user -d reporting_db -f /tmp/seed.sql
+    ```
+
 ## Testing
 See [TESTING_SCENARIO.md](TESTING_SCENARIO.md) for detailed instructions on running Integration and Load tests.

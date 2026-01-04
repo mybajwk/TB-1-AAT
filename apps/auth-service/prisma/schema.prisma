@@ -250,6 +250,7 @@ model Notification {
   typeId            String?  @map("type_id") @db.Uuid
   relatedResourceId String?  @map("related_resource_id") @db.Uuid
   isRead            Boolean  @default(false) @map("is_read")
+  isSent            Boolean  @default(false) @map("is_sent")
   createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   user User              @relation(fields: [userId], references: [id], onDelete: Cascade)
