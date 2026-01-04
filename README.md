@@ -94,5 +94,3 @@ Because this is a persistent architecture, you need to initialize the database s
     kubectl exec -it -n citizen-reporting deploy/postgres -- psql -U user -d reporting_db -f /tmp/seed.sql
     ```
 
-## Testing
-See [TESTING_SCENARIO.md](TESTING_SCENARIO.md) for detailed instructions on running Integration and Load tests.
